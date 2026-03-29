@@ -180,4 +180,4 @@ client.on('messageCreate', async message => {
 // ============================
 // LOGIN DO BOT
 // ============================
-client.login('MTQ4NzU1OTYwNDQ1OTI3NDQzMA.G53Fk1.QRFiA0yWISQdytJB79ak8sXg3zb-708nztLnS8'); // Coloque o token do seu bot
+client.login(process.env.TOKEN);
