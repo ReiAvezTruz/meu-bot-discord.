@@ -24,15 +24,8 @@ client.once("ready", () => {
   console.log(`Bot logado como ${client.user.tag}`);
 });
 
-client.on("guildMemberAdd", (member) => {
-  console.log(`Novo membro entrou: ${member.user.tag}`);
-});
-
 const token = process.env.TOKEN;
 
-if (!token) {
-  console.log("TOKEN NÃO ENCONTRADO!");
-} else {
-  console.log("TOKEN carregado: SIM");
-  client.login(token);
-}
+console.log("TOKEN carregado:", token ? "SIM" : "NÃO");
+
+client.login(token);
