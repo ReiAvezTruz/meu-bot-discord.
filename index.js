@@ -1,183 +1,88 @@
-const { Client, GatewayIntentBits, Colors, PermissionsBitField, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
+const express = require("express");
+const { Client, GatewayIntentBits } = require("discord.js");
+const fs = require("fs");
+
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("Bot online");
+});
+
+app.listen(3000, () => {
+  console.log("Servidor web ativo");
+});
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-// ============================
-// ARQUIVOS DE DADOS
-// ============================
-const XP_FILE = './xp.json';
-let xpData = {};
-if (fs.existsSync(XP_FILE)) xpData = JSON.parse(fs.readFileSync(XP_FILE));
+const ranks = [
+  { name: "Recruta", xp: 0 },
+  { name: "Soldado", xp: 100 },
+  { name: "Cabo", xp: 250 },
+  { name: "Sargento", xp: 500 },
+  { name: "Tenente", xp: 1000 },
+  { name: "Capitão", xp: 2000 },
+  { name: "Major", xp: 3500 },
+  { name: "Coronel", xp: 5000 },
+  { name: "General", xp: 8000 }
+];
 
-const patentes = require('./patentes.json'); // lê patentes e XP
-const ranks = Object.keys(patentes); // lista de patentes
+let data = {};
 
-// ============================
-// FUNÇÃO PARA OBTER PATENTE
-// ============================
-function getRank(xp) {
-    let rank = ranks[0];
-    for (const r of ranks) {
-        if (xp >= patentes[r]) rank = r;
-    }
-    return rank;
+if (fs.existsSync("patentes.json")) {
+  data = JSON.parse(fs.readFileSync("patentes.json"));
 }
 
-// ============================
-// FUNÇÃO PARA CRIAR ROLES SE FALTAR
-// ============================
-async function atualizarPatentes(guild) {
-    for (const rankName of ranks) {
-        let role = guild.roles.cache.find(r => r.name === rankName);
-        if (!role) {
-            await guild.roles.create({
-                name: rankName,
-                color: Colors.Blue,
-                permissions: []
-            });
-            console.log(`Role criada: ${rankName}`);
-        }
-    }
+function saveData() {
+  fs.writeFileSync("patentes.json", JSON.stringify(data, null, 2));
 }
 
-// ============================
-// EVENTO READY
-// ============================
-client.on('ready', async () => {
-    console.log(`Bot logado como ${client.user.tag}`);
-    client.guilds.cache.forEach(async guild => {
-        await atualizarPatentes(guild);
-    });
+client.on("messageCreate", message => {
+  if (message.author.bot) return;
+
+  const id = message.author.id;
+
+  if (!data[id]) {
+    data[id] = {
+      xp: 0,
+      rank: "Recruta"
+    };
+  }
+
+  data[id].xp += 10;
+
+  let newRank = data[id].rank;
+
+  for (let i = ranks.length - 1; i >= 0; i--) {
+    if (data[id].xp >= ranks[i].xp) {
+      newRank = ranks[i].name;
+      break;
+    }
+  }
+
+  if (newRank !== data[id].rank) {
+    data[id].rank = newRank;
+    message.channel.send(
+      `${message.author} foi promovido para **${newRank}**`
+    );
+  }
+
+  saveData();
+
+  if (message.content === "!rank") {
+    message.reply(
+      `Patente: **${data[id].rank}**\nXP: ${data[id].xp}`
+    );
+  }
 });
 
-// ============================
-// COMANDOS
-// ============================
-client.on('messageCreate', async message => {
-    if (!message.guild) return;
-    if (message.author.bot) return;
-
-    const args = message.content.split(' ');
-
-    // -----------------------------
-    // COMANDO !rank
-    // -----------------------------
-    if (args[0].toLowerCase() === '!rank') {
-        const member = message.mentions.members.first() || message.member;
-        const userXP = xpData[member.id] || 0;
-        const rank = getRank(userXP);
-        return message.reply(`${member.user.username} tem ${userXP} XP e sua patente é ${rank}.`);
-    }
-
-    // -----------------------------
-    // COMANDO !addxp
-    // -----------------------------
-    if (args[0].toLowerCase() === '!addxp') {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('Você precisa ser administrador.');
-
-        const member = message.mentions.members.first();
-        const amount = parseInt(args[2]);
-        if (!member || isNaN(amount)) return message.reply('Uso correto: !addxp @usuario quantidade');
-
-        const userId = member.id;
-        if (!xpData[userId]) xpData[userId] = 0;
-        xpData[userId] += amount;
-        fs.writeFileSync(XP_FILE, JSON.stringify(xpData, null, 2));
-
-        // Atualiza role existente
-        const newRank = getRank(xpData[userId]);
-        let role = message.guild.roles.cache.find(r => r.name === newRank);
-        const rolesToRemove = member.roles.cache.filter(r => ranks.includes(r.name) && r.name !== newRank);
-        await member.roles.remove(rolesToRemove);
-        if (role && !member.roles.cache.has(role.id)) await member.roles.add(role);
-
-        return message.channel.send(`${member.user.username} recebeu ${amount} XP e agora sua patente é ${newRank}.`);
-    }
-
-    // -----------------------------
-    // COMANDO !resetxp
-    // -----------------------------
-    if (args[0].toLowerCase() === '!resetxp') {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('Você precisa ser administrador.');
-
-        const member = message.mentions.members.first();
-        if (!member) return message.reply('Uso correto: !resetxp @usuario');
-
-        xpData[member.id] = 0;
-        fs.writeFileSync(XP_FILE, JSON.stringify(xpData, null, 2));
-
-        // Remove todas as roles de patente
-        const rolesToRemove = member.roles.cache.filter(r => ranks.includes(r.name));
-        await member.roles.remove(rolesToRemove);
-
-        return message.channel.send(`${member.user.username} teve o XP resetado e todas as patentes removidas.`);
-    }
-
-    // -----------------------------
-    // COMANDO !ranklist
-    // -----------------------------
-    if (args[0].toLowerCase() === '!ranklist') {
-        let list = '📜 **Lista de Patentes e XP:**\n';
-        message.guild.members.cache.forEach(member => {
-            const userXP = xpData[member.id] || 0;
-            const rank = getRank(userXP);
-            list += `${member.user.username}: ${rank} (${userXP} XP)\n`;
-        });
-        return message.channel.send(list);
-    }
-
-    // -----------------------------
-    // COMANDO !addxpall
-    // -----------------------------
-    if (args[0].toLowerCase() === '!addxpall') {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return message.reply('Você precisa ser administrador.');
-        const amount = parseInt(args[1]);
-        if (isNaN(amount)) return message.reply('Uso correto: !addxpall quantidade');
-
-        message.guild.members.cache.forEach(async member => {
-            if (member.user.bot) return;
-            const userId = member.id;
-            if (!xpData[userId]) xpData[userId] = 0;
-
-            xpData[userId] += amount;
-
-            const newRank = getRank(xpData[userId]);
-            let role = message.guild.roles.cache.find(r => r.name === newRank);
-            const rolesToRemove = member.roles.cache.filter(r => ranks.includes(r.name) && r.name !== newRank);
-            await member.roles.remove(rolesToRemove);
-            if (role && !member.roles.cache.has(role.id)) await member.roles.add(role);
-        });
-
-        fs.writeFileSync(XP_FILE, JSON.stringify(xpData, null, 2));
-        return message.channel.send(`Todos os membros receberam ${amount} XP.`);
-    }
-
-    // -----------------------------
-    // COMANDO !rankinfo
-    // -----------------------------
-    if (args[0].toLowerCase() === '!rankinfo') {
-        const embed = new EmbedBuilder()
-            .setTitle('📜 SISTEMA DE PATENTES - EXÉRCITO DOS EUA')
-            .setColor(Colors.Gold)
-            .setDescription('Lista de patentes e XP necessário');
-
-        for (let i = 0; i < ranks.length; i++) {
-            embed.addFields({ name: ranks[i], value: `XP necessário: ${patentes[ranks[i]]}`, inline: false });
-        }
-
-        return message.channel.send({ embeds: [embed] });
-    }
+client.once("ready", () => {
+  console.log(`Bot logado como ${client.user.tag}`);
 });
 
-// ============================
-// LOGIN DO BOT
-// ============================
 client.login(process.env.TOKEN);
