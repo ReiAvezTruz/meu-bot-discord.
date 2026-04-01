@@ -2,16 +2,8 @@ const fs = require("fs");
 const express = require("express");
 const { Client, GatewayIntentBits } = require("discord.js");
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
-});
-
 // =========================
-// SERVIDOR WEB (RENDER)
+// SERVIDOR WEB (necessário para Render)
 // =========================
 const app = express();
 
@@ -23,6 +15,17 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log("Servidor web ativo na porta " + PORT);
+});
+
+// =========================
+// CLIENT DISCORD
+// =========================
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
 // =========================
@@ -71,7 +74,7 @@ function savePlayers(players) {
 }
 
 // =========================
-// PEGAR PATENTE
+// PEGAR PATENTE POR XP
 // =========================
 function getRankByXP(xp) {
   const ranks = Object.keys(rankLimits);
@@ -86,7 +89,7 @@ function getRankByXP(xp) {
 }
 
 // =========================
-// CRIAR PLAYER
+// CRIAR PLAYER SE NÃO EXISTIR
 // =========================
 function ensurePlayer(players, id) {
   if (!players[id]) {
@@ -98,7 +101,7 @@ function ensurePlayer(players, id) {
 }
 
 // =========================
-// BOT ONLINE
+// BOT PRONTO
 // =========================
 client.once("ready", () => {
   console.log(`Bot logado como ${client.user.tag}`);
@@ -124,21 +127,15 @@ client.on("messageCreate", async (message) => {
 
   ensurePlayer(players, target.id);
 
-  // =========================
   // !rank
-  // =========================
   if (command === "!rank") {
 
     const p = players[target.id];
 
-    message.reply(
-      `${target} possui **${p.xp} XP**\nPatente: **${p.rank}**`
-    );
+    message.reply(`${target} possui **${p.xp} XP**\nPatente: **${p.rank}**`);
   }
 
-  // =========================
   // !addxp
-  // =========================
   else if (command === "!addxp") {
 
     const qtd = parseInt(args[1]);
@@ -150,14 +147,10 @@ client.on("messageCreate", async (message) => {
     players[target.id].xp += qtd;
     players[target.id].rank = getRankByXP(players[target.id].xp);
 
-    message.reply(
-      `${target} recebeu **${qtd} XP**\nNova patente: **${players[target.id].rank}**`
-    );
+    message.reply(`${target} recebeu **${qtd} XP**\nNova patente: **${players[target.id].rank}**`);
   }
 
-  // =========================
   // !resetxp
-  // =========================
   else if (command === "!resetxp") {
 
     players[target.id] = {
@@ -168,9 +161,7 @@ client.on("messageCreate", async (message) => {
     message.reply(`${target} teve o XP resetado.`);
   }
 
-  // =========================
   // !ranklist
-  // =========================
   else if (command === "!ranklist") {
 
     const list = Object.entries(players)
@@ -180,9 +171,7 @@ client.on("messageCreate", async (message) => {
     message.channel.send(list || "Nenhum jogador registrado.");
   }
 
-  // =========================
   // !addxpall
-  // =========================
   else if (command === "!addxpall") {
 
     const qtd = parseInt(args[0]);
@@ -199,9 +188,7 @@ client.on("messageCreate", async (message) => {
     message.reply(`Todos receberam **${qtd} XP**`);
   }
 
-  // =========================
   // !rankinfo
-  // =========================
   else if (command === "!rankinfo") {
 
     const info = Object.entries(rankLimits)
@@ -217,4 +204,4 @@ client.on("messageCreate", async (message) => {
 // =========================
 // LOGIN BOT
 // =========================
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN);A
