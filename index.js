@@ -1,7 +1,6 @@
-const fs = require('fs');
-const { Client, GatewayIntentBits } = require('discord.js');
-
-const BOT_TOKEN = "SEU_TOKEN_AQUI";
+const fs = require("fs");
+const express = require("express");
+const { Client, GatewayIntentBits } = require("discord.js");
 
 const client = new Client({
   intents: [
@@ -11,7 +10,24 @@ const client = new Client({
   ]
 });
 
-// PATENTES (não alterei nenhuma)
+// =========================
+// SERVIDOR WEB (RENDER)
+// =========================
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("Bot Discord Online");
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Servidor web ativo na porta " + PORT);
+});
+
+// =========================
+// PATENTES
+// =========================
 const rankLimits = {
   "RECRUTA": 0,
   "SOLDADO": 250,
@@ -37,20 +53,26 @@ const rankLimits = {
   "GENERAL DO EXÉRCITO": 500000
 };
 
+// =========================
 // CARREGAR PLAYERS
+// =========================
 function loadPlayers() {
-  if (!fs.existsSync('players.json')) {
-    fs.writeFileSync('players.json', '{}');
+  if (!fs.existsSync("players.json")) {
+    fs.writeFileSync("players.json", "{}");
   }
-  return JSON.parse(fs.readFileSync('players.json', 'utf8'));
+  return JSON.parse(fs.readFileSync("players.json", "utf8"));
 }
 
-// SALVAR
+// =========================
+// SALVAR PLAYERS
+// =========================
 function savePlayers(players) {
-  fs.writeFileSync('players.json', JSON.stringify(players, null, 2));
+  fs.writeFileSync("players.json", JSON.stringify(players, null, 2));
 }
 
+// =========================
 // PEGAR PATENTE
+// =========================
 function getRankByXP(xp) {
   const ranks = Object.keys(rankLimits);
 
@@ -63,7 +85,9 @@ function getRankByXP(xp) {
   return "RECRUTA";
 }
 
+// =========================
 // CRIAR PLAYER
+// =========================
 function ensurePlayer(players, id) {
   if (!players[id]) {
     players[id] = {
@@ -73,11 +97,17 @@ function ensurePlayer(players, id) {
   }
 }
 
-client.once('ready', () => {
+// =========================
+// BOT ONLINE
+// =========================
+client.once("ready", () => {
   console.log(`Bot logado como ${client.user.tag}`);
 });
 
-client.on('messageCreate', async (message) => {
+// =========================
+// COMANDOS
+// =========================
+client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
   if (!message.guild) return;
@@ -94,7 +124,9 @@ client.on('messageCreate', async (message) => {
 
   ensurePlayer(players, target.id);
 
+  // =========================
   // !rank
+  // =========================
   if (command === "!rank") {
 
     const p = players[target.id];
@@ -104,7 +136,9 @@ client.on('messageCreate', async (message) => {
     );
   }
 
+  // =========================
   // !addxp
+  // =========================
   else if (command === "!addxp") {
 
     const qtd = parseInt(args[1]);
@@ -121,7 +155,9 @@ client.on('messageCreate', async (message) => {
     );
   }
 
+  // =========================
   // !resetxp
+  // =========================
   else if (command === "!resetxp") {
 
     players[target.id] = {
@@ -132,7 +168,9 @@ client.on('messageCreate', async (message) => {
     message.reply(`${target} teve o XP resetado.`);
   }
 
+  // =========================
   // !ranklist
+  // =========================
   else if (command === "!ranklist") {
 
     const list = Object.entries(players)
@@ -142,7 +180,9 @@ client.on('messageCreate', async (message) => {
     message.channel.send(list || "Nenhum jogador registrado.");
   }
 
+  // =========================
   // !addxpall
+  // =========================
   else if (command === "!addxpall") {
 
     const qtd = parseInt(args[0]);
@@ -159,7 +199,9 @@ client.on('messageCreate', async (message) => {
     message.reply(`Todos receberam **${qtd} XP**`);
   }
 
+  // =========================
   // !rankinfo
+  // =========================
   else if (command === "!rankinfo") {
 
     const info = Object.entries(rankLimits)
@@ -172,4 +214,7 @@ client.on('messageCreate', async (message) => {
   savePlayers(players);
 });
 
+// =========================
+// LOGIN BOT
+// =========================
 client.login(process.env.DISCORD_TOKEN);
