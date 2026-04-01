@@ -204,4 +204,4 @@ client.on("messageCreate", async (message) => {
 // =========================
 // LOGIN BOT
 // =========================
-client.login(process.env.DISCORD_TOKEN);A
+client.login(process.env.DISCORD_TOKEN);
