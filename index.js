@@ -24,8 +24,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.MessageContent
   ]
 });
 
@@ -58,24 +57,14 @@ const rankLimits = {
 };
 
 // =========================
-// IDs DOS CARGOS DO DISCORD
-// =========================
-const rankRoles = {
-  "RECRUTA": "ID_DO_CARGO_RECRUTA",
-  "SOLDADO": "ID_DO_CARGO_SOLDADO",
-  "SOLDADO DE PRIMEIRA CLASSE": "ID_DO_CARGO_SPC",
-  "ESPECIALISTA": "ID_DO_CARGO_ESPECIALISTA",
-  "CABO": "ID_DO_CARGO_CABO",
-  "SARGENTO": "ID_DO_CARGO_SARGENTO"
-};
-
-// =========================
 // PLAYERS
 // =========================
 function loadPlayers() {
+
   if (!fs.existsSync("players.json")) {
     fs.writeFileSync("players.json", "{}");
   }
+
   return JSON.parse(fs.readFileSync("players.json", "utf8"));
 }
 
@@ -84,81 +73,62 @@ function savePlayers(players) {
 }
 
 // =========================
-// PEGAR PATENTE POR XP
+// PEGAR PATENTE
 // =========================
 function getRankByXP(xp) {
 
   const ranks = Object.keys(rankLimits);
 
   for (let i = ranks.length - 1; i >= 0; i--) {
+
     if (xp >= rankLimits[ranks[i]]) {
       return ranks[i];
     }
+
   }
 
   return "RECRUTA";
 }
 
 // =========================
-// GARANTIR PLAYER
+// CRIAR PLAYER
 // =========================
 function ensurePlayer(players, id) {
+
   if (!players[id]) {
+
     players[id] = {
       xp: 0,
       rank: "RECRUTA"
     };
+
   }
+
 }
 
 // =========================
-// ATUALIZAR CARGO
-// =========================
-async function updateRole(member, rank) {
-
-  const roleId = rankRoles[rank];
-  if (!roleId) return;
-
-  for (const r in rankRoles) {
-    const removeId = rankRoles[r];
-    if (member.roles.cache.has(removeId)) {
-      await member.roles.remove(removeId).catch(() => {});
-    }
-  }
-
-  await member.roles.add(roleId).catch(() => {});
-}
-
-// =========================
-// PLAYER ENTRA NO SERVER
-// =========================
-client.on("guildMemberAdd", async member => {
-
-  const players = loadPlayers();
-
-  ensurePlayer(players, member.id);
-
-  await updateRole(member, players[member.id].rank);
-
-  savePlayers(players);
-});
-
-// =========================
-// BOT PRONTO
+// BOT ONLINE
 // =========================
 client.once("ready", () => {
+
   console.log(`Bot logado como ${client.user.tag}`);
+
 });
 
 // =========================
-// COMANDOS
+// MENSAGENS
 // =========================
-client.on("messageCreate", async message => {
+client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
   if (!message.guild) return;
 
   const players = loadPlayers();
+
+  // cria jogador automaticamente
+  ensurePlayer(players, message.author.id);
+
+  savePlayers(players);
 
   const args = message.content.trim().split(/ +/);
   const command = args.shift().toLowerCase();
@@ -178,12 +148,13 @@ client.on("messageCreate", async message => {
     const p = players[target.id];
 
     message.reply(`${target} possui **${p.xp} XP**\nPatente: **${p.rank}**`);
+
   }
 
   // =========================
   // !addxp
   // =========================
-  else if (command === "!addxp") {
+  if (command === "!addxp") {
 
     const qtd = parseInt(args[1]);
 
@@ -193,59 +164,79 @@ client.on("messageCreate", async message => {
 
     players[target.id].xp += qtd;
 
-    const newRank = getRankByXP(players[target.id].xp);
-    players[target.id].rank = newRank;
+    players[target.id].rank = getRankByXP(players[target.id].xp);
 
-    const member = await message.guild.members.fetch(target.id);
-    await updateRole(member, newRank);
+    message.reply(`${target} recebeu **${qtd} XP**\nNova patente: **${players[target.id].rank}**`);
 
-    message.reply(`${target} recebeu **${qtd} XP**\nNova patente: **${newRank}**`);
   }
 
   // =========================
   // !resetxp
   // =========================
-  else if (command === "!resetxp") {
+  if (command === "!resetxp") {
 
     players[target.id] = {
       xp: 0,
       rank: "RECRUTA"
     };
 
-    const member = await message.guild.members.fetch(target.id);
-    await updateRole(member, "RECRUTA");
-
     message.reply(`${target} teve o XP resetado.`);
+
   }
 
   // =========================
   // !ranklist
   // =========================
-  else if (command === "!ranklist") {
+  if (command === "!ranklist") {
 
     const list = Object.entries(players)
       .map(([id, data]) => `<@${id}> → ${data.xp} XP → ${data.rank}`)
       .join("\n");
 
     message.channel.send(list || "Nenhum jogador registrado.");
+
+  }
+
+  // =========================
+  // !addxpall
+  // =========================
+  if (command === "!addxpall") {
+
+    const qtd = parseInt(args[0]);
+
+    if (isNaN(qtd)) {
+      return message.reply("Digite uma quantidade válida!");
+    }
+
+    for (const id in players) {
+
+      players[id].xp += qtd;
+      players[id].rank = getRankByXP(players[id].xp);
+
+    }
+
+    message.reply(`Todos receberam **${qtd} XP**`);
+
   }
 
   // =========================
   // !rankinfo
   // =========================
-  else if (command === "!rankinfo") {
+  if (command === "!rankinfo") {
 
     const info = Object.entries(rankLimits)
       .map(([rank, xp]) => `${rank} → ${xp} XP`)
       .join("\n");
 
     message.channel.send("📜 **Patentes:**\n" + info);
+
   }
 
   savePlayers(players);
+
 });
 
 // =========================
-// LOGIN BOT
+// LOGIN
 // =========================
 client.login(process.env.DISCORD_TOKEN);
