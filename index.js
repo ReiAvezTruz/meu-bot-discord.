@@ -1,6 +1,14 @@
 const fs = require("fs");
 const express = require("express");
+const axios = require("axios");
 const { Client, GatewayIntentBits } = require("discord.js");
+
+// =========================
+// CONFIG GITHUB
+// =========================
+const GITHUB_OWNER = "SEU_USUARIO";
+const GITHUB_REPO = "meu-bot-discord";
+const GITHUB_FILE = "players.json";
 
 // =========================
 // SERVIDOR WEB (Render)
@@ -11,10 +19,27 @@ app.get("/", (req, res) => {
   res.send("Bot Discord Online");
 });
 
+// API para o MOD do Arma Reforger
+app.get("/rank/:id", (req, res) => {
+
+  const players = loadPlayers();
+  const id = req.params.id;
+
+  if (!players[id]) {
+    return res.json({
+      xp: 0,
+      rank: "RECRUTA"
+    });
+  }
+
+  res.json(players[id]);
+
+});
+
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
-  console.log("Servidor web ativo na porta " + PORT);
+  console.log("Servidor web ativo porta " + PORT);
 });
 
 // =========================
@@ -51,62 +76,147 @@ const rankLimits = {
 };
 
 // =========================
+// DOWNLOAD PLAYERS DO GITHUB
+// =========================
+async function downloadPlayersFromGithub() {
+
+  const token = process.env.GITHUB_TOKEN;
+
+  try {
+
+    const res = await axios.get(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+      {
+        headers: { Authorization: `token ${token}` }
+      }
+    );
+
+    const content = Buffer.from(res.data.content, "base64").toString();
+
+    fs.writeFileSync("players.json", content);
+
+    console.log("players.json carregado do GitHub");
+
+  } catch {
+
+    console.log("players.json não encontrado no GitHub");
+
+  }
+
+}
+
+// =========================
+// UPLOAD PLAYERS PARA GITHUB
+// =========================
+async function uploadToGithub(content) {
+
+  const token = process.env.GITHUB_TOKEN;
+
+  let sha;
+
+  try {
+
+    const file = await axios.get(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+      {
+        headers: { Authorization: `token ${token}` }
+      }
+    );
+
+    sha = file.data.sha;
+
+  } catch {}
+
+  await axios.put(
+    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+    {
+      message: "update players xp",
+      content: Buffer.from(content).toString("base64"),
+      sha: sha
+    },
+    {
+      headers: { Authorization: `token ${token}` }
+    }
+  );
+
+}
+
+// =========================
 // CARREGAR PLAYERS
 // =========================
 function loadPlayers() {
+
   if (!fs.existsSync("players.json")) {
     fs.writeFileSync("players.json", "{}");
   }
+
   return JSON.parse(fs.readFileSync("players.json", "utf8"));
+
 }
 
 // =========================
 // SALVAR PLAYERS
 // =========================
 function savePlayers(players) {
-  fs.writeFileSync("players.json", JSON.stringify(players, null, 2));
+
+  const data = JSON.stringify(players, null, 2);
+
+  fs.writeFileSync("players.json", data);
+
+  uploadToGithub(data);
+
 }
 
 // =========================
-// PEGAR PATENTE POR XP
+// PEGAR PATENTE
 // =========================
 function getRankByXP(xp) {
+
   const ranks = Object.keys(rankLimits);
 
   for (let i = ranks.length - 1; i >= 0; i--) {
+
     if (xp >= rankLimits[ranks[i]]) {
       return ranks[i];
     }
+
   }
 
   return "RECRUTA";
+
 }
 
 // =========================
 // CRIAR PLAYER
 // =========================
 function ensurePlayer(players, id) {
+
   if (!players[id]) {
+
     players[id] = {
       xp: 0,
       rank: "RECRUTA"
     };
+
   }
+
 }
 
 // =========================
-// ATUALIZAR CARGO
+// ATUALIZAR CARGO DISCORD
 // =========================
 async function updateRole(member, rank) {
 
   const roles = Object.keys(rankLimits);
 
   for (const r of roles) {
+
     const role = member.guild.roles.cache.find(x => x.name === r);
 
     if (role && member.roles.cache.has(role.id)) {
       await member.roles.remove(role);
     }
+
   }
 
   const newRole = member.guild.roles.cache.find(x => x.name === rank);
@@ -114,13 +224,18 @@ async function updateRole(member, rank) {
   if (newRole) {
     await member.roles.add(newRole);
   }
+
 }
 
 // =========================
 // BOT PRONTO
 // =========================
-client.once("ready", () => {
+client.once("ready", async () => {
+
   console.log(`Bot logado como ${client.user.tag}`);
+
+  await downloadPlayersFromGithub();
+
 });
 
 // =========================
@@ -143,19 +258,16 @@ client.on("messageCreate", async (message) => {
 
   ensurePlayer(players, target.id);
 
-  // =========================
   // !rank
-  // =========================
   if (command === "!rank") {
 
     const p = players[target.id];
 
     message.reply(`${target} possui **${p.xp} XP**\nPatente: **${p.rank}**`);
+
   }
 
-  // =========================
   // !addxp
-  // =========================
   else if (command === "!addxp") {
 
     const qtd = parseInt(args[1]);
@@ -178,9 +290,7 @@ client.on("messageCreate", async (message) => {
 
       await updateRole(member, newRank);
 
-      message.reply(
-        `${target} recebeu **${qtd} XP**\n🎖 Nova patente: **${newRank}**`
-      );
+      message.reply(`${target} recebeu **${qtd} XP**\n🎖 Nova patente: **${newRank}**`);
 
     } else {
 
@@ -189,11 +299,10 @@ client.on("messageCreate", async (message) => {
     }
 
     savePlayers(players);
+
   }
 
-  // =========================
   // !resetxp
-  // =========================
   else if (command === "!resetxp") {
 
     players[target.id] = {
@@ -208,11 +317,10 @@ client.on("messageCreate", async (message) => {
     message.reply(`${target} teve o XP resetado.`);
 
     savePlayers(players);
+
   }
 
-  // =========================
   // !ranklist
-  // =========================
   else if (command === "!ranklist") {
 
     const list = Object.entries(players)
@@ -220,11 +328,10 @@ client.on("messageCreate", async (message) => {
       .join("\n");
 
     message.channel.send(list || "Nenhum jogador registrado.");
+
   }
 
-  // =========================
   // !addxpall
-  // =========================
   else if (command === "!addxpall") {
 
     const qtd = parseInt(args[0]);
@@ -252,29 +359,7 @@ client.on("messageCreate", async (message) => {
     message.reply(`Todos receberam **${qtd} XP**`);
 
     savePlayers(players);
-  }
 
-  // =========================
-  // !rankinfo
-  // =========================
-  else if (command === "!rankinfo") {
-
-    const infoXP = Object.entries(rankLimits)
-      .map(([rank, xp]) => `${rank} → ${xp} XP`)
-      .join("\n");
-
-    const infoMerito = `
-GENERAL DE BRIGADA → Mérito Coronel
-GENERAL DE DIVISÃO → Mérito Coronel
-GENERAL DE CORPO DE EXÉRCITO → Mérito Coronel
-`;
-
-    message.channel.send(
-      "📜 **Patentes:**\n\n" +
-      infoXP +
-      "\n" +
-      infoMerito
-    );
   }
 
 });
