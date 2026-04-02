@@ -6,7 +6,7 @@ const { Client, GatewayIntentBits } = require("discord.js");
 // =========================
 // CONFIG GITHUB
 // =========================
-const GITHUB_OWNER = "SEU_USUARIO";
+const GITHUB_OWNER = "ReiAvezTruz";
 const GITHUB_REPO = "meu-bot-discord";
 const GITHUB_FILE = "players.json";
 
@@ -19,7 +19,7 @@ app.get("/", (req, res) => {
   res.send("Bot Discord Online");
 });
 
-// API para o MOD do Arma Reforger
+// API para o mod do Arma
 app.get("/rank/:id", (req, res) => {
 
   const players = loadPlayers();
