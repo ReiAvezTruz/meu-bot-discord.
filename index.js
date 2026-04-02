@@ -39,9 +39,9 @@ const rankLimits = {
   "RECRUTA": 0,
   "SOLDADO": 250,
   "CABO": 500,
-  "PRIMEIRO SARGENTO": 1000,
+  "TERCEIRO SARGENTO": 1000,
   "SEGUNDO SARGENTO": 2000,
-  "TERCEIRO SARGENTO": 3500,
+  "PRIMEIRO SARGENTO": 3500,
   "SUB TENENTE": 4750,
   "ASPIRANTE TENENTE": 6000,
   "SEGUNDO TENENTE": 7000,
@@ -255,17 +255,26 @@ client.on("messageCreate", async (message) => {
   // =========================
   // !rankinfo
   // =========================
-  else if (command === "!rankinfo") {
 
-    const info = Object.entries(rankLimits)
-      .map(([rank, xp]) => `${rank} → ${xp} XP`)
-      .join("\n");
+else if (command === "!rankinfo") {
 
-    message.channel.send("📜 **Patentes:**\n" + info);
-  }
+  const infoXP = Object.entries(rankLimits)
+    .map(([rank, xp]) => `${rank} → ${xp} XP`)
+    .join("\n");
 
-  savePlayers(players);
-});
+  const infoMerito = `
+GENERAL DE BRIGADA → Mérito Coronel
+GENERAL DE DIVISÃO → Mérito Coronel
+GENERAL DE CORPO DE EXÉRCITO → Mérito Coronel
+`;
+
+  message.channel.send(
+    "📜 **Patentes:**\n\n" +
+    infoXP +
+    "\n" +
+    infoMerito
+  );
+}
 
 // =========================
 // LOGIN BOT
