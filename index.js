@@ -9,9 +9,10 @@ const { Client, GatewayIntentBits } = require("discord.js");
 const GITHUB_OWNER = "ReiAvezTruz";
 const GITHUB_REPO = "meu-bot-discord";
 const GITHUB_FILE = "players.json";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 // =========================
-// SERVIDOR WEB (Render)
+// SERVIDOR WEB
 // =========================
 const app = express();
 
@@ -19,17 +20,14 @@ app.get("/", (req, res) => {
   res.send("Bot Discord Online");
 });
 
-// API para o mod do Arma
+// API para mod do Arma Reforger
 app.get("/rank/:id", (req, res) => {
 
   const players = loadPlayers();
   const id = req.params.id;
 
   if (!players[id]) {
-    return res.json({
-      xp: 0,
-      rank: "RECRUTA"
-    });
+    return res.json({ rank: "RECRUTA", xp: 0 });
   }
 
   res.json(players[id]);
@@ -58,6 +56,7 @@ const client = new Client({
 // PATENTES
 // =========================
 const rankLimits = {
+
   "RECRUTA": 0,
   "SOLDADO": 250,
   "CABO": 500,
@@ -73,73 +72,8 @@ const rankLimits = {
   "TENENTE CORONEL": 13000,
   "CORONEL": 15000,
   "MARECHAL": 30000
+
 };
-
-// =========================
-// DOWNLOAD PLAYERS DO GITHUB
-// =========================
-async function downloadPlayersFromGithub() {
-
-  const token = process.env.GITHUB_TOKEN;
-
-  try {
-
-    const res = await axios.get(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
-      {
-        headers: { Authorization: `token ${token}` }
-      }
-    );
-
-    const content = Buffer.from(res.data.content, "base64").toString();
-
-    fs.writeFileSync("players.json", content);
-
-    console.log("players.json carregado do GitHub");
-
-  } catch {
-
-    console.log("players.json não encontrado no GitHub");
-
-  }
-
-}
-
-// =========================
-// UPLOAD PLAYERS PARA GITHUB
-// =========================
-async function uploadToGithub(content) {
-
-  const token = process.env.GITHUB_TOKEN;
-
-  let sha;
-
-  try {
-
-    const file = await axios.get(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
-      {
-        headers: { Authorization: `token ${token}` }
-      }
-    );
-
-    sha = file.data.sha;
-
-  } catch {}
-
-  await axios.put(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
-    {
-      message: "update players xp",
-      content: Buffer.from(content).toString("base64"),
-      sha: sha
-    },
-    {
-      headers: { Authorization: `token ${token}` }
-    }
-  );
-
-}
 
 // =========================
 // CARREGAR PLAYERS
@@ -159,16 +93,56 @@ function loadPlayers() {
 // =========================
 function savePlayers(players) {
 
-  const data = JSON.stringify(players, null, 2);
-
-  fs.writeFileSync("players.json", data);
-
-  uploadToGithub(data);
+  fs.writeFileSync("players.json", JSON.stringify(players, null, 2));
+  uploadToGitHub(players);
 
 }
 
 // =========================
-// PEGAR PATENTE
+// SALVAR NO GITHUB
+// =========================
+async function uploadToGitHub(players) {
+
+  if (!GITHUB_TOKEN) return;
+
+  const content = Buffer.from(JSON.stringify(players, null, 2)).toString("base64");
+
+  try {
+
+    const res = await axios.get(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+      { headers: { Authorization: `token ${GITHUB_TOKEN}` } }
+    );
+
+    const sha = res.data.sha;
+
+    await axios.put(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+      {
+        message: "update players xp",
+        content: content,
+        sha: sha
+      },
+      { headers: { Authorization: `token ${GITHUB_TOKEN}` } }
+    );
+
+  } catch {
+
+    await axios.put(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`,
+      {
+        message: "create players xp",
+        content: content
+      },
+      { headers: { Authorization: `token ${GITHUB_TOKEN}` } }
+    );
+
+  }
+
+}
+
+// =========================
+// RANK POR XP
 // =========================
 function getRankByXP(xp) {
 
@@ -203,7 +177,7 @@ function ensurePlayer(players, id) {
 }
 
 // =========================
-// ATUALIZAR CARGO DISCORD
+// ATUALIZAR CARGO
 // =========================
 async function updateRole(member, rank) {
 
@@ -230,12 +204,8 @@ async function updateRole(member, rank) {
 // =========================
 // BOT PRONTO
 // =========================
-client.once("ready", async () => {
-
+client.once("clientReady", () => {
   console.log(`Bot logado como ${client.user.tag}`);
-
-  await downloadPlayersFromGithub();
-
 });
 
 // =========================
@@ -302,6 +272,30 @@ client.on("messageCreate", async (message) => {
 
   }
 
+  // !addxps (silencioso)
+  else if (command === "!addxps") {
+
+    const qtd = parseInt(args[1]);
+    if (isNaN(qtd)) return;
+
+    const oldRank = players[target.id].rank;
+
+    players[target.id].xp += qtd;
+
+    const newRank = getRankByXP(players[target.id].xp);
+
+    players[target.id].rank = newRank;
+
+    const member = await message.guild.members.fetch(target.id);
+
+    if (oldRank !== newRank) {
+      await updateRole(member, newRank);
+    }
+
+    savePlayers(players);
+
+  }
+
   // !resetxp
   else if (command === "!resetxp") {
 
@@ -359,6 +353,42 @@ client.on("messageCreate", async (message) => {
     message.reply(`Todos receberam **${qtd} XP**`);
 
     savePlayers(players);
+
+  }
+
+  // !rankinfo
+  else if (command === "!rankinfo") {
+
+    const infoXP = `
+RECRUTA → 0 XP
+SOLDADO → 250 XP
+CABO → 500 XP
+TERCEIRO SARGENTO → 1000 XP
+SEGUNDO SARGENTO → 2000 XP
+PRIMEIRO SARGENTO → 3500 XP
+SUB TENENTE → 4750 XP
+ASPIRANTE TENENTE → 6000 XP
+SEGUNDO TENENTE → 7000 XP
+PRIMEIRO TENENTE → 8750 XP
+CAPITÃO → 10000 XP
+MAJOR → 11500 XP
+TENENTE CORONEL → 13000 XP
+CORONEL → 15000 XP
+MARECHAL → 30000 XP
+`;
+
+    const infoMerito = `
+GENERAL DE BRIGADA → Mérito Coronel
+GENERAL DE DIVISÃO → Mérito Coronel
+GENERAL DE CORPO DE EXÉRCITO → Mérito Coronel
+`;
+
+    message.channel.send(
+      "📜 **Patentes por XP:**\n" +
+      infoXP +
+      "\n⭐ **Patentes por mérito:**\n" +
+      infoMerito
+    );
 
   }
 
