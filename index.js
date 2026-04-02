@@ -32,9 +32,6 @@ const client = new Client({
 // =========================
 // PATENTES
 // =========================
-// =========================
-// PATENTES
-// =========================
 const rankLimits = {
   "RECRUTA": 0,
   "SOLDADO": 250,
@@ -104,15 +101,14 @@ async function updateRole(member, rank) {
 
   const roles = Object.keys(rankLimits);
 
-  // remover cargos antigos
   for (const r of roles) {
     const role = member.guild.roles.cache.find(x => x.name === r);
+
     if (role && member.roles.cache.has(role.id)) {
       await member.roles.remove(role);
     }
   }
 
-  // adicionar novo cargo
   const newRole = member.guild.roles.cache.find(x => x.name === rank);
 
   if (newRole) {
@@ -162,36 +158,38 @@ client.on("messageCreate", async (message) => {
   // =========================
   else if (command === "!addxp") {
 
-  const qtd = parseInt(args[1]);
+    const qtd = parseInt(args[1]);
 
-  if (isNaN(qtd)) {
-    return message.reply("Digite uma quantidade válida!");
+    if (isNaN(qtd)) {
+      return message.reply("Digite uma quantidade válida!");
+    }
+
+    const oldRank = players[target.id].rank;
+
+    players[target.id].xp += qtd;
+
+    const newRank = getRankByXP(players[target.id].xp);
+
+    players[target.id].rank = newRank;
+
+    const member = await message.guild.members.fetch(target.id);
+
+    if (oldRank !== newRank) {
+
+      await updateRole(member, newRank);
+
+      message.reply(
+        `${target} recebeu **${qtd} XP**\n🎖 Nova patente: **${newRank}**`
+      );
+
+    } else {
+
+      message.reply(`${target} recebeu **${qtd} XP**`);
+
+    }
+
+    savePlayers(players);
   }
-
-  const oldRank = players[target.id].rank;
-
-  players[target.id].xp += qtd;
-
-  const newRank = getRankByXP(players[target.id].xp);
-
-  players[target.id].rank = newRank;
-
-  const member = await message.guild.members.fetch(target.id);
-
-  if (oldRank !== newRank) {
-
-    await updateRole(member, newRank);
-
-    message.reply(
-      `${target} recebeu **${qtd} XP**\n🎖 Nova patente: **${newRank}**`
-    );
-
-  } else {
-
-    message.reply(`${target} recebeu **${qtd} XP**`);
-
-  }
-}
 
   // =========================
   // !resetxp
@@ -208,6 +206,8 @@ client.on("messageCreate", async (message) => {
     await updateRole(member, "RECRUTA");
 
     message.reply(`${target} teve o XP resetado.`);
+
+    savePlayers(players);
   }
 
   // =========================
@@ -250,31 +250,34 @@ client.on("messageCreate", async (message) => {
     }
 
     message.reply(`Todos receberam **${qtd} XP**`);
+
+    savePlayers(players);
   }
 
   // =========================
   // !rankinfo
   // =========================
+  else if (command === "!rankinfo") {
 
-else if (command === "!rankinfo") {
+    const infoXP = Object.entries(rankLimits)
+      .map(([rank, xp]) => `${rank} → ${xp} XP`)
+      .join("\n");
 
-  const infoXP = Object.entries(rankLimits)
-    .map(([rank, xp]) => `${rank} → ${xp} XP`)
-    .join("\n");
-
-  const infoMerito = `
+    const infoMerito = `
 GENERAL DE BRIGADA → Mérito Coronel
 GENERAL DE DIVISÃO → Mérito Coronel
 GENERAL DE CORPO DE EXÉRCITO → Mérito Coronel
 `;
 
-  message.channel.send(
-    "📜 **Patentes:**\n\n" +
-    infoXP +
-    "\n" +
-    infoMerito
-  );
-}
+    message.channel.send(
+      "📜 **Patentes:**\n\n" +
+      infoXP +
+      "\n" +
+      infoMerito
+    );
+  }
+
+});
 
 // =========================
 // LOGIN BOT
