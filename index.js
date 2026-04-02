@@ -32,29 +32,25 @@ const client = new Client({
 // =========================
 // PATENTES
 // =========================
+// =========================
+// PATENTES
+// =========================
 const rankLimits = {
   "RECRUTA": 0,
   "SOLDADO": 250,
-  "SOLDADO DE PRIMEIRA CLASSE": 500,
-  "ESPECIALISTA": 1000,
-  "CABO": 2000,
-  "SARGENTO": 3500,
-  "SARGENTO DE ESQUADRA": 9700,
-  "SARGENTO PRIMEIRA CLASSE": 17000,
-  "MASTER SARGENTO": 22000,
-  "PRIMEIRO SARGENTO": 27000,
-  "SARGENTO-MOR": 30000,
-  "SARGENTO-MOR DO EXÉRCITO": 35000,
-  "SEGUNDO-TENENTE": 40000,
-  "PRIMEIRO-TENENTE": 47000,
-  "CAPITÃO": 55000,
-  "MAJOR": 65000,
-  "TENENTE-CORONEL": 70000,
-  "CORONEL": 80000,
-  "GENERAL DE BRIGADA": 90000,
-  "GENERAL DE DIVISÃO": 100000,
-  "GENERAL DE CORPO DE EXÉRCITO": 110000,
-  "GENERAL DO EXÉRCITO": 500000
+  "CABO": 500,
+  "PRIMEIRO SARGENTO": 1000,
+  "SEGUNDO SARGENTO": 2000,
+  "TERCEIRO SARGENTO": 3500,
+  "SUB TENENTE": 4750,
+  "ASPIRANTE TENENTE": 6000,
+  "SEGUNDO TENENTE": 7000,
+  "PRIMEIRO TENENTE": 8750,
+  "CAPITÃO": 10000,
+  "MAJOR": 11500,
+  "TENENTE CORONEL": 13000,
+  "CORONEL": 15000,
+  "MARECHAL": 30000
 };
 
 // =========================
@@ -166,24 +162,36 @@ client.on("messageCreate", async (message) => {
   // =========================
   else if (command === "!addxp") {
 
-    const qtd = parseInt(args[1]);
+  const qtd = parseInt(args[1]);
 
-    if (isNaN(qtd)) {
-      return message.reply("Digite uma quantidade válida!");
-    }
+  if (isNaN(qtd)) {
+    return message.reply("Digite uma quantidade válida!");
+  }
 
-    players[target.id].xp += qtd;
+  const oldRank = players[target.id].rank;
 
-    const newRank = getRankByXP(players[target.id].xp);
+  players[target.id].xp += qtd;
 
-    players[target.id].rank = newRank;
+  const newRank = getRankByXP(players[target.id].xp);
 
-    const member = await message.guild.members.fetch(target.id);
+  players[target.id].rank = newRank;
+
+  const member = await message.guild.members.fetch(target.id);
+
+  if (oldRank !== newRank) {
 
     await updateRole(member, newRank);
 
-    message.reply(`${target} recebeu **${qtd} XP**\nNova patente: **${newRank}**`);
+    message.reply(
+      `${target} recebeu **${qtd} XP**\n🎖 Nova patente: **${newRank}**`
+    );
+
+  } else {
+
+    message.reply(`${target} recebeu **${qtd} XP**`);
+
   }
+}
 
   // =========================
   // !resetxp
