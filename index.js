@@ -98,9 +98,7 @@ function getRank(xp) {
   for (let i = 0; i < ranks.length; i++) {
 
     if (xp >= ranks[i].xp) {
-
       rank = ranks[i].name;
-
     }
 
   }
@@ -121,6 +119,10 @@ if (message.author.bot) return;
 
 const args = message.content.split(" ");
 const cmd = args[0].toLowerCase();
+
+if(message.content.startsWith("!")){
+message.delete().catch(()=>{});
+}
 
 if (cmd === "!rank") {
 
@@ -241,7 +243,45 @@ Ganhe XP participando de missões.
 
 Use !rank para ver sua patente.
 Use !ranklist para ver todas patentes.
+Use !topxp para ver o ranking do servidor.
 `);
+
+}
+
+if (cmd === "!topxp") {
+
+let lista = Object.entries(players)
+.map(([id,data]) => ({
+id:id,
+xp:data.xp,
+rank:getRank(data.xp)
+}))
+.sort((a,b)=>b.xp-a.xp)
+.slice(0,10);
+
+let texto = "🏆 **TOP XP DO SERVIDOR**\n\n";
+
+let pos = 1;
+
+for (const p of lista) {
+
+let user;
+
+try{
+user = await client.users.fetch(p.id);
+}catch{
+user = null;
+}
+
+let nome = user ? user.username : p.id;
+
+texto += `${pos}° ${nome} — ${p.xp} XP — ${p.rank}\n`;
+
+pos++;
+
+}
+
+message.channel.send(texto || "Nenhum jogador registrado.");
 
 }
 
