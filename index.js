@@ -256,35 +256,30 @@ id:id,
 xp:data.xp,
 rank:getRank(data.xp)
 }))
-.sort((a,b)=>b.xp-a.xp)
-.slice(0,10);
+.sort((a,b)=>b.xp-a.xp);
 
-let texto = "🏆 **TOP XP DO SERVIDOR**\n\n";
-
-let pos = 1;
-
-for (const p of lista) {
-
-let user;
-
-try{
-user = await client.users.fetch(p.id);
-}catch{
-user = null;
+if(lista.length === 0){
+return message.channel.send("Nenhum jogador registrado.");
 }
 
-let nome = user ? user.username : p.id;
+let texto = "🏆 **═══ TOP XP DO SERVIDOR ═══** 🏆\n\n";
 
-texto += `${pos}° ${nome} — ${p.xp} XP — ${p.rank}\n`;
+lista.forEach((p,index)=>{
 
-pos++;
+let medal = "🏅";
 
-}
+if(index===0) medal="🥇";
+if(index===1) medal="🥈";
+if(index===2) medal="🥉";
 
-message.channel.send(texto || "Nenhum jogador registrado.");
-
-}
+texto += `${medal} **${index+1}º** <@${p.id}> — **${p.xp} XP** — **${p.rank}**\n`;
 
 });
+
+message.channel.send(texto);
+
+}
+
+}); // ← FECHA messageCreate
 
 client.login(TOKEN);
